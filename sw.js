@@ -1,5 +1,5 @@
 // Bump this string on every deploy to force clients to update.
-const CACHE = 'treino-v3';
+const CACHE = 'treino-v4';
 
 const ASSETS = [
   './',
@@ -29,7 +29,12 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+  e.waitUntil(
+    caches.open(CACHE)
+      // bypass the HTTP cache so a new version never precaches stale files
+      .then((c) => c.addAll(ASSETS.map((u) => new Request(u, { cache: 'reload' }))))
+      .then(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener('activate', (e) => {
@@ -43,21 +48,24 @@ self.addEventListener('fetch', (e) => {
   const { request } = e;
   if (request.method !== 'GET' || new URL(request.url).origin !== location.origin) return;
 
+  // Navigations: try network first (fresh app), fall back to the cached shell offline.
   if (request.mode === 'navigate') {
     e.respondWith(fetch(request).catch(() => caches.match('./index.html')));
     return;
   }
 
+  // Everything else: serve the precached version (authoritative for this CACHE);
+  // only hit the network for things not in the precache list.
   e.respondWith(
     caches.match(request).then((cached) => {
-      const network = fetch(request).then((res) => {
-        if (res && res.ok) {
+      if (cached) return cached;
+      return fetch(request).then((res) => {
+        if (res && res.ok && res.type === 'basic') {
           const copy = res.clone();
           caches.open(CACHE).then((c) => c.put(request, copy));
         }
         return res;
-      }).catch(() => cached);
-      return cached || network;
+      });
     })
   );
 });
