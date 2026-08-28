@@ -40,6 +40,15 @@ Abra <http://localhost:8777>. (Service worker / instalação só funcionam em
 Precisa estar publicado em **HTTPS**. Veja [DEPLOY.md](DEPLOY.md).
 Depois, no Safari: **Compartilhar → Adicionar à Tela de Início**.
 
+## Publicar uma atualização
+
+```bash
+python scripts/deploy.py "o que mudou"
+```
+
+Bump do cache + commit + push. O GitHub Pages reconstrói sozinho e o app no
+iPhone recarrega na versão nova ao abrir (com internet).
+
 ## Backup (importante no iOS)
 
 O iOS pode apagar os dados de sites/PWAs pouco usados. O app pede

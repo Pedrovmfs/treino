@@ -38,10 +38,20 @@ Em ~1 min o app fica em `https://SEU_USUARIO.github.io/treino/`.
 3. Abra pelo ícone. Agora roda em tela cheia e offline.
 4. Primeira vez com internet para o service worker cachear tudo.
 
-## Ao publicar uma nova versão
+## Publicar uma atualização (depois do setup)
 
-Edite `sw.js` e troque `treino-v1` por `treino-v2` (e assim por diante).
-Sem isso, o iPhone pode continuar servindo a versão antiga do cache.
+O setup acima é **uma vez só**. Para publicar mudanças depois:
+
+```bash
+python scripts/deploy.py "o que mudou"
+```
+
+Isso faz o bump da versão do cache (`sw.js`), commita e dá push. O GitHub
+Pages reconstrói em ~1 min. **O app instalado no iPhone se atualiza sozinho**
+na próxima vez que você abrir com internet (detecta a versão nova e recarrega).
+
+Se preferir na mão: edite `sw.js` trocando `treino-vN` pelo próximo número,
+depois `git add -A && git commit -m "..." && git push`.
 
 ## Backup dos dados
 
