@@ -11,6 +11,20 @@ let bar = null;
 const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.max(0, Math.round(s)) % 60).padStart(2, '0')}`;
 const left = () => (pausedAt != null ? pausedAt : Math.max(0, (endsAt - Date.now()) / 1000));
 
+let wantNotify = true;
+export function setRestNotify(on) { wantNotify = !!on; }
+
+async function notifyRestDone() {
+  if (!wantNotify) return;
+  try {
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+    const reg = await navigator.serviceWorker?.getRegistration();
+    const opts = { body: 'Bora pra próxima série 💪', tag: 'rest-done', renotify: true };
+    if (reg && reg.showNotification) await reg.showNotification('⏱ Descanso acabou', opts);
+    else new Notification('⏱ Descanso acabou', opts);
+  } catch { /* ignore */ }
+}
+
 // must run inside a user gesture at least once for sound to work on iOS
 export function unlockAudio() {
   try {
@@ -88,7 +102,8 @@ function paint() {
     // only alert if we're within ~30s of the end (app may have been backgrounded)
     if (Date.now() - endsAt < 30000) {
       beeps();
-      try { navigator.vibrate?.([120, 80, 120]); } catch { /* unsupported */ }
+      try { navigator.vibrate?.([180, 90, 180, 90, 180]); } catch { /* unsupported */ }
+      notifyRestDone();
     }
   }
   b.querySelector('.rt-time').textContent = finished ? 'descanso ok' : mmss(s);

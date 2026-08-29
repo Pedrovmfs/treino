@@ -81,6 +81,9 @@ export function sessionView({ id }) {
   // exercises
   session.entries.forEach((entry, ei) => kids.push(entryCard(session, entry, ei, finished)));
 
+  // cardio
+  kids.push(cardioCard(session, finished));
+
   // notes
   kids.push(card({},
     el('label', {}, 'Observações do treino'),
@@ -315,6 +318,68 @@ function setRow(session, entry, set, si, prev, finished, renderSets, updateDelta
   }
   if (extra.childNodes.length) row.append(extra);
 
+  return row;
+}
+
+const CARDIO_NAMES = ['Esteira', 'Bike', 'Elíptico', 'Escada', 'Corrida', 'Remo', 'Caminhada', 'Pular corda'];
+const rid = () => 'c' + Math.random().toString(36).slice(2, 9);
+
+function cardioCard(session, finished) {
+  session.cardio = session.cardio || [];
+  const wrap = card({});
+  const total = session.cardio.reduce((t, c) => t + (Number(c.minutes) || 0), 0);
+  wrap.append(el('div', { class: 'row between' },
+    el('h3', { style: 'margin:0' }, '🏃 Cardio'),
+    el('small', {}, total ? total + ' min' : '')));
+
+  const box = el('div', { style: 'margin-top:6px' });
+  const render = () => {
+    box.innerHTML = '';
+    if (!session.cardio.length) {
+      box.append(el('p', { class: 'muted', style: 'font-size:.83rem;margin:4px 0' },
+        finished ? 'Sem cardio.' : 'Nada ainda.'));
+    }
+    session.cardio.forEach((c, i) => box.append(cardioRow(session, c, i, finished, render)));
+  };
+  render();
+  wrap.append(box);
+
+  if (!finished) {
+    wrap.append(el('button', { class: 'btn-sm', style: 'margin-top:6px', onclick: () => {
+      session.cardio.push({ id: rid(), name: 'Esteira', minutes: null, distance: null, note: '' });
+      store.saveSession(session); render();
+    } }, '+ adicionar'));
+  }
+  return wrap;
+}
+
+function cardioRow(session, c, i, finished, render) {
+  const nameIn = el('input', {
+    value: c.name || '', list: 'cardio-names', placeholder: 'Aparelho',
+    disabled: finished, oninput: (e) => { c.name = e.target.value; autosave(session); },
+  });
+  const minIn = el('input', {
+    type: 'text', inputmode: 'numeric', value: c.minutes ?? '', placeholder: 'min', style: 'text-align:center',
+    disabled: finished, oninput: (e) => { c.minutes = parseNum(e.target.value); autosave(session); },
+  });
+  const distIn = el('input', {
+    type: 'text', inputmode: 'decimal', value: c.distance ?? '', placeholder: 'km', style: 'text-align:center',
+    disabled: finished, oninput: (e) => { c.distance = parseNum(e.target.value); autosave(session); },
+  });
+  const noteIn = el('input', {
+    value: c.note || '', placeholder: 'nota (opcional)',
+    disabled: finished, oninput: (e) => { c.note = e.target.value; autosave(session); },
+  });
+  const row = el('div', { class: 'cardio-row' },
+    el('datalist', { id: 'cardio-names' }, ...CARDIO_NAMES.map((n) => el('option', { value: n }))),
+    el('div', { class: 'row', style: 'gap:6px' },
+      nameIn,
+      !finished ? el('button', { class: 'btn-sm btn-danger', style: 'flex:none', onclick: async () => {
+        await store.mutateSession(session, 'Cardio removido', () => { session.cardio.splice(i, 1); });
+        render(); store.offerUndo();
+      } }, '✕') : null),
+    el('div', { class: 'row', style: 'gap:6px' }, minIn, distIn),
+    noteIn);
   return row;
 }
 

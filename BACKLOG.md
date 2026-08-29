@@ -20,6 +20,9 @@ Lista viva. Marcar `[x]` quando entregar; adicionar novas ideias no fim.
 - [x] PR na hora (aviso ao bater recorde no treino + "PRs do mês" no Progresso)
 - [x] Heatmap de frequência + streak
 - [x] Botão "próximo" / auto-scroll pro próximo exercício
+- [x] Aviso de fim de descanso: vibração (Android) + notificação (iOS/PWA), opt-in
+- [x] Lembrar onde estava: scroll por tela + volta pro treino em andamento ao reabrir
+- [x] Bloco de cardio (por sessão ou "Registrar cardio" avulso; minutos/km/nota)
 
 ## A fazer
 

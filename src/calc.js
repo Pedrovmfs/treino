@@ -114,12 +114,24 @@ export function isoWeek(dateStr) {
   return `${d.getFullYear()}-W${String(week).padStart(2, '0')}`;
 }
 
+export function sessionCardioMinutes(session) {
+  return (session.cardio || []).reduce((t, c) => t + (Number(c.minutes) || 0), 0);
+}
+export function weeklyCardioMinutes(sessions, week) {
+  const wk = week || isoWeek(new Date().toISOString().slice(0, 10));
+  let min = 0;
+  for (const s of sessions) {
+    if (s.finishedAt && isoWeek(s.date) === wk) min += sessionCardioMinutes(s);
+  }
+  return min;
+}
+
 // session length in whole minutes (startedAt -> finishedAt), or null
 export function sessionDuration(session) {
   if (!session.startedAt || !session.finishedAt) return null;
   const ms = new Date(session.finishedAt) - new Date(session.startedAt);
-  if (!(ms > 0)) return null;
-  return Math.round(ms / 60000);
+  const min = Math.round(ms / 60000);
+  return min >= 1 ? min : null;
 }
 export function fmtDuration(min) {
   if (min == null) return '—';
@@ -186,8 +198,9 @@ export function dailyActivity(sessions) {
   const m = new Map();
   for (const s of sessions) {
     if (!s.finishedAt) continue;
-    const cur = m.get(s.date) || { date: s.date, sets: 0, names: [] };
+    const cur = m.get(s.date) || { date: s.date, sets: 0, cardio: 0, names: [] };
     cur.sets += sessionWorkSetCount(s);
+    cur.cardio += sessionCardioMinutes(s);
     cur.names.push(s.workoutName);
     m.set(s.date, cur);
   }

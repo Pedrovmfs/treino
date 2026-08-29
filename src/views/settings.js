@@ -6,6 +6,7 @@ import * as db from '../db.js';
 import { applyTheme } from '../theme.js';
 import { wakeLockSupported } from '../wakelock.js';
 import { APP_VERSION, checkForUpdate } from '../update.js';
+import { setRestNotify } from '../components/restTimer.js';
 import * as profiles from '../profiles.js';
 
 const toggle = (on, onClick) => el('button', {
@@ -21,6 +22,8 @@ export function settings() {
   const restOn = store.getMeta('restTimerOn', true);
   const awake = store.getMeta('keepAwake', true);
   const rirOn = store.getMeta('trackRIR', false);
+  const notifyOn = store.getMeta('restNotify', true)
+    && typeof Notification !== 'undefined' && Notification.permission === 'granted';
   const restField = (key, label, dflt) => el('div', { class: 'row between', style: 'gap:10px' },
     el('label', { style: 'margin:0;flex:1' }, label),
     el('input', {
@@ -39,6 +42,19 @@ export function settings() {
       restField('restPrep', 'Descanso após prep', 75),
       restField('restWarmup', 'Descanso após aquecimento', 45),
     ) : null,
+    restOn ? el('div', { class: 'row between', style: 'margin-bottom:8px' },
+      el('label', { style: 'margin:0' }, 'Avisar quando o descanso acabar (vibra/notifica)'),
+      toggle(notifyOn, async () => {
+        if (!notifyOn) {
+          const perm = typeof Notification !== 'undefined' ? await Notification.requestPermission() : 'denied';
+          if (perm !== 'granted') { toast('Permissão de notificação negada'); return; }
+          await store.setMeta('restNotify', true);
+        } else {
+          await store.setMeta('restNotify', false);
+        }
+        setRestNotify(store.getMeta('restNotify', true));
+        navigate('/settings');
+      })) : null,
     el('div', { class: 'row between', style: 'margin-bottom:8px' },
       el('label', { style: 'margin:0' }, 'Manter tela acesa no treino'
         + (wakeLockSupported() ? '' : ' (não suportado)')),

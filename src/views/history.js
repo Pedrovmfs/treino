@@ -2,7 +2,7 @@ import { el, fmtDate, relDays, num } from '../ui.js';
 import { screen, card, empty } from './layout.js';
 import { navigate } from '../router.js';
 import * as store from '../store.js';
-import { sessionVolume, sessionWorkSetCount, sessionDuration, fmtDuration } from '../calc.js';
+import { sessionVolume, sessionWorkSetCount, sessionDuration, fmtDuration, sessionCardioMinutes } from '../calc.js';
 
 const MONTHS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 
@@ -30,15 +30,20 @@ export function history(_, query) {
     if (key !== curKey) { curKey = key; kids.push(el('div', { class: 'list-sep' }, key)); }
     const vol = sessionVolume(s);
     const d = sessionDuration(s);
+    const cardioMin = sessionCardioMinutes(s);
+    const sets = sessionWorkSetCount(s);
+    const parts = [fmtDate(s.date)];
+    if (sets) parts.push(`${sets} séries`);
+    if (cardioMin) parts.push(`🏃 ${cardioMin} min`);
+    if (d != null) parts.push(fmtDuration(d));
     kids.push(card({ tappable: true, onclick: () => navigate('/session/' + s.id) },
       el('div', { class: 'row between' },
         el('div', {},
           el('h3', { style: 'margin-bottom:2px' }, s.workoutName),
-          el('small', {}, `${fmtDate(s.date)} · ${sessionWorkSetCount(s)} séries`
-            + (d != null ? ` · ${fmtDuration(d)}` : ''))),
-        el('div', { style: 'text-align:right' },
+          el('small', {}, parts.join(' · '))),
+        sets ? el('div', { style: 'text-align:right' },
           el('div', { style: 'font-weight:700' }, num(vol / 1000) + ' t'),
-          el('small', {}, 'volume')))));
+          el('small', {}, 'volume')) : null)));
   }
 
   return screen({ title: 'Histórico', children: kids });

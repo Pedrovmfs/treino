@@ -195,6 +195,21 @@ export async function startSession(workoutId) {
         sets,
       };
     }),
+    cardio: [],
+  };
+  await db.put('sessions', session);
+  state.sessions.push(session);
+  emit();
+  return session;
+}
+
+export async function startCardioSession() {
+  const now = new Date().toISOString();
+  const session = {
+    id: uid(), workoutId: null, workoutName: 'Cardio',
+    date: todayLocal(), startedAt: now, finishedAt: null,
+    bodyweight: null, notes: '', entries: [],
+    cardio: [{ id: uid(), name: 'Esteira', minutes: null, distance: null, note: '' }],
   };
   await db.put('sessions', session);
   state.sessions.push(session);

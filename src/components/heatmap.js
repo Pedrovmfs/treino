@@ -38,15 +38,20 @@ export function heatmap(activity, weeks = 16) {
       const key = iso(d);
       const a = activity.get(key);
       const n = a ? a.sets : 0;
-      const level = n === 0 ? 0 : n <= 6 ? 1 : n <= 12 ? 2 : 3;
+      const cardioOnly = a && n === 0 && a.cardio > 0;
+      const level = n === 0 ? (cardioOnly ? 1 : 0) : n <= 6 ? 1 : n <= 12 ? 2 : 3;
       const fill = level === 0 ? 'var(--surface-2)'
-        : `color-mix(in srgb, var(--accent) ${25 + level * 25}%, transparent)`;
+        : cardioOnly ? 'color-mix(in srgb, var(--good) 45%, transparent)'
+          : `color-mix(in srgb, var(--accent) ${25 + level * 25}%, transparent)`;
       const rect = s('rect', {
         x: padL + c * (cell + gap), y: padT + r * (cell + gap),
         width: cell, height: cell, rx: 3, fill,
       });
       const [, m, day] = key.split('-');
-      rect.append(s('title', {}, a ? `${day}/${m} · ${a.names.join(', ')} · ${a.sets} séries` : `${day}/${m} · —`));
+      const label = a
+        ? `${day}/${m} · ${a.names.join(', ')}` + (a.sets ? ` · ${a.sets} séries` : '') + (a.cardio ? ` · ${a.cardio} min cardio` : '')
+        : `${day}/${m} · —`;
+      rect.append(s('title', {}, label));
       svg.append(rect);
     }
   }

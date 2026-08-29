@@ -6,7 +6,7 @@ import { lineChart, barChart } from '../components/chart.js';
 import { heatmap } from '../components/heatmap.js';
 import {
   exerciseSeries, exercisePRs, weeklyVolume, trend, muscleSetsForWeek, isoWeek,
-  dailyActivity, weekStreak, sessionsInLastDays, prsThisMonth,
+  dailyActivity, weekStreak, sessionsInLastDays, prsThisMonth, weeklyCardioMinutes,
 } from '../calc.js';
 
 export function progressList() {
@@ -19,10 +19,12 @@ export function progressList() {
   }
 
   // frequency heatmap + streak
+  const cardioMin = weeklyCardioMinutes(sessions);
   kids.push(card({},
     el('div', { class: 'row between', style: 'align-items:baseline' },
       el('h3', { style: 'margin:0' }, 'Frequência'),
-      el('small', {}, `${sessionsInLastDays(sessions, 30)} em 30 dias · streak ${weekStreak(sessions)} sem`)),
+      el('small', {}, `${sessionsInLastDays(sessions, 30)} em 30 dias · streak ${weekStreak(sessions)} sem`
+        + (cardioMin ? ` · 🏃 ${cardioMin} min` : ''))),
     heatmap(dailyActivity(sessions), 16)));
 
   // PRs do mês

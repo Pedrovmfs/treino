@@ -9,13 +9,27 @@ import { progressList, progressDetail } from './views/progress.js';
 import { manage, workoutEditor } from './views/manage.js';
 import { settings } from './views/settings.js';
 import { setWakeLock } from './wakelock.js';
+import { setRestNotify } from './components/restTimer.js';
 
 const app = document.getElementById('app');
 const tabbar = document.getElementById('tabbar');
 
+// remember scroll position per route so leaving and coming back lands you where you were
+let scrollMem = new Map();
+try { scrollMem = new Map(JSON.parse(sessionStorage.getItem('treino.scroll') || '[]')); } catch { /* ignore */ }
+const saveScroll = () => {
+  if (renderedPath != null) scrollMem.set(renderedPath, window.scrollY || 0);
+  try { sessionStorage.setItem('treino.scroll', JSON.stringify([...scrollMem])); } catch { /* ignore */ }
+};
+window.addEventListener('pagehide', saveScroll);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveScroll(); });
+
 let lastView = null;
+let renderedPath = null;
 function mount(viewFn) {
   lastView = viewFn;
+  const path = currentPath().split('?')[0];
+  if (renderedPath != null && renderedPath !== path) scrollMem.set(renderedPath, window.scrollY || 0);
   clear(app);
   // close any floating panels from a previous view
   document.querySelectorAll('body > .card[style*="fixed"]').forEach((n) => n.remove());
@@ -26,11 +40,14 @@ function mount(viewFn) {
     console.error(err);
     app.append(Object.assign(document.createElement('pre'), { textContent: 'Erro: ' + err.message + '\n' + err.stack }));
   }
-  window.scrollTo(0, 0);
+  const y = scrollMem.get(path) || 0;
+  window.scrollTo(0, y);
+  requestAnimationFrame(() => window.scrollTo(0, y)); // again after layout for tall pages
+  renderedPath = path;
+  try { localStorage.setItem('treino.lastRoute', path); } catch { /* ignore */ }
   updateTabs();
 
   // keep the screen on only while logging an unfinished session (if enabled)
-  const path = currentPath().split('?')[0];
   const inActiveSession = path.startsWith('/session/')
     && !store.sessionById(path.split('/')[2])?.finishedAt;
   setWakeLock(inActiveSession && store.getMeta('keepAwake', true));
@@ -87,6 +104,14 @@ async function boot() {
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => {
     if (store.getMeta('theme', 'auto') === 'auto') applyTheme('auto');
   });
+  setRestNotify(store.getMeta('restNotify', true));
+
+  // cold launch with no route (PWA start_url): drop straight back into an
+  // in-progress workout instead of the home screen
+  if (!location.hash || location.hash === '#/' || location.hash === '#') {
+    const act = store.activeSession();
+    if (act) location.replace('#/session/' + act.id);
+  }
 
   if (navigator.storage && navigator.storage.persist) {
     navigator.storage.persisted().then((p) => { if (!p) navigator.storage.persist().catch(() => {}); });

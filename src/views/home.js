@@ -49,6 +49,13 @@ export function home() {
         el('span', { class: 'pill accent' }, 'Iniciar'))));
   }
 
+  if (!active) {
+    kids.push(el('button', { class: 'btn btn-block', style: 'margin-top:4px', onclick: async () => {
+      const se = await store.startCardioSession();
+      navigate('/session/' + se.id);
+    } }, '🏃 Registrar cardio'));
+  }
+
   return screen({ title: 'Hoje', children: kids });
 }
 

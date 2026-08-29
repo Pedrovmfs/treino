@@ -173,6 +173,11 @@ textarea { min-height: 72px; resize: vertical; }
   color: var(--text-dim); font-size: .72rem;
 }
 .ex-pr { font-weight: 700; }
+
+.cardio-row { display: grid; gap: 6px; padding: 8px 0; }
+.cardio-row + .cardio-row { border-top: 1px dashed var(--border); }
+.cardio-row .row:first-of-type input { flex: 1; }
+.cardio-row input { min-height: 40px; }
 .chk { width: 32px; height: 40px; display: grid; place-items: center; }
 .chk input { width: 22px; height: 22px; min-height: 0; }
 
