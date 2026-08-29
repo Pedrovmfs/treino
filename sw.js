@@ -1,5 +1,5 @@
 // Bump this string on every deploy to force clients to update.
-const CACHE = 'treino-v5';
+const CACHE = 'treino-v6';
 
 const ASSETS = [
   './',

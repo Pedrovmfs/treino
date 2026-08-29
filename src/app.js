@@ -109,11 +109,15 @@ async function boot() {
       reloading = true;
       location.reload();
     });
-    navigator.serviceWorker.register('sw.js').then((reg) => {
+    // updateViaCache:'none' => the sw.js update check never uses the HTTP cache
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then((reg) => {
+      reg.update().catch(() => {});
       // check for a new version whenever the app returns to the foreground
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') reg.update().catch(() => {});
       });
+      // and periodically while it stays open
+      setInterval(() => reg.update().catch(() => {}), 60 * 60 * 1000);
     }).catch(() => { /* offline / unsupported */ });
   }
 }
