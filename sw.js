@@ -1,5 +1,5 @@
 // Bump this string on every deploy to force clients to update.
-const CACHE = 'treino-v6';
+const CACHE = 'treino-v7';
 
 const ASSETS = [
   './',
@@ -30,13 +30,22 @@ const ASSETS = [
   './assets/icons/apple-touch-icon.png',
 ];
 
+// Files that MUST be cached for the app to boot offline. If any of these fail
+// during install, the install fails and the old version keeps serving (safe).
+const CRITICAL = ['./', './index.html', './src/app.js', './src/styles.css'];
+
 self.addEventListener('install', (e) => {
-  e.waitUntil(
-    caches.open(CACHE)
-      // bypass the HTTP cache so a new version never precaches stale files
-      .then((c) => c.addAll(ASSETS.map((u) => new Request(u, { cache: 'reload' }))))
-      .then(() => self.skipWaiting())
-  );
+  e.waitUntil((async () => {
+    const c = await caches.open(CACHE);
+    // Per-file so one flaky/not-yet-propagated asset can't abort the whole update.
+    // Missing non-critical files get lazily cached by the fetch handler later.
+    await Promise.allSettled(
+      ASSETS.map((u) => c.add(new Request(u, { cache: 'reload' })))
+    );
+    const shell = await Promise.all(CRITICAL.map((u) => c.match(u)));
+    if (shell.some((r) => !r)) throw new Error('shell incompleto — nova versão adiada');
+    await self.skipWaiting();
+  })());
 });
 
 self.addEventListener('activate', (e) => {
