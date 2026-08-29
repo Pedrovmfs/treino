@@ -133,30 +133,59 @@ textarea { min-height: 72px; resize: vertical; }
 /* ---------- set logger ---------- */
 .set-row {
   display: grid;
-  grid-template-columns: 62px 1fr 1fr 40px;
-  gap: 8px; align-items: center;
-  padding: 6px 0;
+  grid-template-columns: 44px 1.55fr 1fr 30px;
+  gap: 5px; align-items: center;
+  padding: 8px 0;
 }
 .set-row + .set-row { border-top: 1px dashed var(--border); }
 .set-tag {
-  font-size: .72rem; text-transform: uppercase; letter-spacing: .03em;
-  padding: 4px 6px; border-radius: 8px; text-align: center; cursor: pointer;
+  font-size: .64rem; text-transform: uppercase; letter-spacing: .02em;
+  padding: 6px 2px; border-radius: 8px; text-align: center; cursor: pointer;
   background: var(--surface-2); color: var(--text-dim); user-select: none;
 }
 .set-tag[data-type="work"] { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); }
 .set-tag[data-type="prep"] { background: color-mix(in srgb, var(--warn) 22%, transparent); color: var(--warn); }
 .set-tag[data-type="warmup"] { background: var(--surface-2); color: var(--text-dim); }
-.set-row input { text-align: center; padding: 8px 4px; }
-.set-row .unit { position: relative; }
+
+.stepper { display: flex; align-items: stretch; gap: 3px; min-width: 0; }
+.set-row input {
+  text-align: center; padding: 9px 2px;
+  font-variant-numeric: tabular-nums;
+}
+.stepper input { flex: 1; min-width: 0; }
+.stepper button {
+  flex: none; width: 30px; padding: 0; min-height: 42px;
+  font-size: 1.15rem; line-height: 1; border-radius: 8px;
+  background: var(--surface-2);
+}
 .set-row .prev-hint {
-  grid-column: 2 / 4; font-size: .74rem; color: var(--text-dim); margin-top: -2px;
+  grid-column: 2 / 4; font-size: .72rem; color: var(--text-dim); margin-top: 2px;
   cursor: pointer;
 }
-.chk { width: var(--tap); height: var(--tap); display: grid; place-items: center; }
+.chk { width: 32px; height: 40px; display: grid; place-items: center; }
 .chk input { width: 22px; height: 22px; min-height: 0; }
+
+/* ---------- rest timer bar ---------- */
+.rest-bar {
+  position: fixed; left: 8px; right: 8px;
+  bottom: calc(58px + var(--safe-bottom));
+  max-width: 604px; margin: 0 auto;
+  display: flex; align-items: center; gap: 6px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 6px; z-index: 45;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .18);
+}
+.rest-bar.done { border-color: var(--good); background: color-mix(in srgb, var(--good) 14%, var(--surface)); }
+.rest-bar .rt-mid { flex: 1; min-width: 0; }
+.rest-bar .rt-time { font-weight: 700; font-variant-numeric: tabular-nums; }
+.rest-bar .rt-track { height: 4px; background: var(--surface-2); border-radius: 2px; margin-top: 3px; overflow: hidden; }
+.rest-bar .rt-fill { height: 100%; background: var(--accent); width: 100%; transition: width 1s linear; }
+.rest-bar.done .rt-fill { background: var(--good); }
+.rest-bar .rt-adj { min-height: 38px; padding: 0 8px; font-size: .82rem; }
 
 .ex-check { color: var(--good); font-weight: 700; }
 .card.done-ex { border-color: color-mix(in srgb, var(--good) 45%, var(--border)); }
+.ex-note { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; margin: 2px 0 4px; }
 
 /* ---------- delta ---------- */
 .delta { font-weight: 600; font-size: .82rem; }
@@ -196,6 +225,11 @@ textarea { min-height: 72px; resize: vertical; }
 .kpi { background: var(--surface-2); border-radius: 10px; padding: 10px 12px; }
 .kpi .v { font-size: 1.15rem; font-weight: 700; }
 .kpi .l { font-size: .75rem; color: var(--text-dim); }
+.msc-row { display: grid; grid-template-columns: 84px 1fr 46px; gap: 8px; align-items: center; padding: 5px 0; }
+.msc-name { font-size: .84rem; text-transform: capitalize; }
+.msc-bar { height: 8px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
+.msc-bar > span { display: block; height: 100%; background: var(--accent); }
+.msc-val { font-size: .84rem; font-weight: 600; text-align: right; }
 table.log { width: 100%; border-collapse: collapse; font-size: .88rem; }
 table.log th, table.log td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
 table.log th { color: var(--text-dim); font-weight: 600; }

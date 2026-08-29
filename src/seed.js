@@ -12,39 +12,46 @@ export function defaultSetTypes(n) {
   return ['warmup', 'prep', ...Array(n - 2).fill('work')];
 }
 
+// [name, muscle, load increment in kg for the +/- steppers]
 const EX = [
-  ['Peck deck', 'peito'],
-  ['Supino com halteres (inclinado)', 'peito'],
-  ['Cross over', 'peito'],
-  ['Desenvolvimento (ombro)', 'ombro'],
-  ['Tríceps francês', 'tríceps'],
-  ['Tríceps corda', 'tríceps'],
-  ['Puxada aberta', 'costas'],
-  ['Remada curvada', 'costas'],
-  ['Remada triângulo', 'costas'],
-  ['Peck deck invertido', 'ombro'],
-  ['Rosca direta (barra)', 'bíceps'],
-  ['Rosca Scott', 'bíceps'],
-  ['Leg press', 'quadríceps'],
-  ['Agachamento livre ou Hack', 'quadríceps'],
-  ['Cadeira extensora', 'quadríceps'],
-  ['Cadeira flexora', 'posterior'],
-  ['Panturrilha em pé', 'panturrilha'],
-  ['Flexão de punho', 'antebraço'],
-  ['Extensão de punho', 'antebraço'],
-  ['Supino reto', 'peito'],
-  ['Peito inclinado máquina (reserva: smith)', 'peito'],
-  ['Puxada triângulo', 'costas'],
-  ['Remada com barra', 'costas'],
-  ['Elevação lateral halteres', 'ombro'],
-  ['Rosca direta / Rosca Scott (alternando semana)', 'bíceps'],
-  ['Tríceps francês / Tríceps corda (alternando semana)', 'tríceps'],
-  ['Panturrilha sentada', 'panturrilha'],
-  ['Stiff', 'posterior'],
-  ['Elevação pélvica (reserva: mesa flexora)', 'glúteo'],
-  ['Cadeira extensora / Leg press / Smith (à escolha)', 'quadríceps'],
-  ['Panturrilha em pé (reserva: leg press)', 'panturrilha'],
+  ['Peck deck', 'peito', 5],
+  ['Supino com halteres (inclinado)', 'peito', 2],
+  ['Cross over', 'peito', 2.5],
+  ['Desenvolvimento (ombro)', 'ombro', 2.5],
+  ['Tríceps francês', 'tríceps', 2.5],
+  ['Tríceps corda', 'tríceps', 2.5],
+  ['Puxada aberta', 'costas', 5],
+  ['Remada curvada', 'costas', 5],
+  ['Remada triângulo', 'costas', 5],
+  ['Peck deck invertido', 'ombro', 5],
+  ['Rosca direta (barra)', 'bíceps', 2.5],
+  ['Rosca Scott', 'bíceps', 2.5],
+  ['Leg press', 'quadríceps', 10],
+  ['Agachamento livre ou Hack', 'quadríceps', 5],
+  ['Cadeira extensora', 'quadríceps', 5],
+  ['Cadeira flexora', 'posterior', 5],
+  ['Panturrilha em pé', 'panturrilha', 10],
+  ['Flexão de punho', 'antebraço', 2],
+  ['Extensão de punho', 'antebraço', 2],
+  ['Supino reto', 'peito', 5],
+  ['Peito inclinado máquina (reserva: smith)', 'peito', 5],
+  ['Puxada triângulo', 'costas', 5],
+  ['Remada com barra', 'costas', 5],
+  ['Elevação lateral halteres', 'ombro', 2],
+  ['Rosca direta / Rosca Scott (alternando semana)', 'bíceps', 2.5],
+  ['Tríceps francês / Tríceps corda (alternando semana)', 'tríceps', 2.5],
+  ['Panturrilha sentada', 'panturrilha', 5],
+  ['Stiff', 'posterior', 5],
+  ['Elevação pélvica (reserva: mesa flexora)', 'glúteo', 10],
+  ['Cadeira extensora / Leg press / Smith (à escolha)', 'quadríceps', 5],
+  ['Panturrilha em pé (reserva: leg press)', 'panturrilha', 10],
 ];
+
+// map of exercise id -> default increment, used to backfill existing installs
+export const DEFAULT_INCREMENTS = Object.fromEntries(
+  EX.map(([name, , inc]) => [slug(name), inc || 2.5])
+);
+export const DEFAULT_INCREMENT = 2.5;
 
 const WORKOUTS = [
   ['Treino A — Push', [
@@ -78,7 +85,9 @@ export async function seedIfNeeded() {
   if (existing.length) { await metaSet('seeded', true); return; }
 
   const now = new Date().toISOString();
-  const exercises = EX.map(([name, muscle]) => ({ id: slug(name), name, muscle, notes: '', createdAt: now }));
+  const exercises = EX.map(([name, muscle, inc]) => ({
+    id: slug(name), name, muscle, notes: '', increment: inc || DEFAULT_INCREMENT, createdAt: now,
+  }));
   await bulkPut('exercises', exercises);
 
   const workouts = WORKOUTS.map(([name, items], i) => ({

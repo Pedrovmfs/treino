@@ -4,7 +4,7 @@ import { navigate } from '../router.js';
 import * as store from '../store.js';
 import { lineChart, barChart } from '../components/chart.js';
 import {
-  exerciseSeries, exercisePRs, weeklyVolume, trend,
+  exerciseSeries, exercisePRs, weeklyVolume, trend, muscleSetsForWeek, isoWeek,
 } from '../calc.js';
 
 export function progressList() {
@@ -29,6 +29,27 @@ export function progressList() {
     kpi(diff == null ? '—' : (diff >= 0 ? '+' : '') + num(diff) + ' t', 'vs semana passada'),
     kpi(String(thisW ? thisW.sessions : 0), 'treinos esta semana'),
     kpi(String(thisW ? thisW.sets : 0), 'séries válidas')));
+
+  // sets per muscle group — this week vs last
+  const muscleOf = (id) => store.exerciseById(id)?.muscle || 'outros';
+  const prevWkDate = new Date(); prevWkDate.setDate(prevWkDate.getDate() - 7);
+  const cur = muscleSetsForWeek(sessions, muscleOf);
+  const prevWk = muscleSetsForWeek(sessions, muscleOf, isoWeek(prevWkDate.toISOString().slice(0, 10)));
+  const muscles = [...new Set([...Object.keys(cur), ...Object.keys(prevWk)])]
+    .sort((a, b) => (cur[b] || 0) - (cur[a] || 0));
+  if (muscles.length) {
+    const max = Math.max(1, ...muscles.map((m) => cur[m] || 0));
+    kids.push(card({},
+      el('h3', {}, 'Séries por grupo — esta semana'),
+      ...muscles.map((m) => {
+        const n = cur[m] || 0, was = prevWk[m] || 0, d = n - was;
+        return el('div', { class: 'msc-row' },
+          el('span', { class: 'msc-name' }, m),
+          el('span', { class: 'msc-bar' }, el('span', { style: `width:${(n / max) * 100}%` })),
+          el('span', { class: 'msc-val' }, String(n),
+            d ? el('small', { style: `color:var(--${d > 0 ? 'good' : 'bad'})` }, ` ${d > 0 ? '+' : ''}${d}`) : null));
+      })));
+  }
 
   // exercise list, most recently trained first
   const lastByEx = new Map();

@@ -1,5 +1,5 @@
 // Bump this string on every deploy to force clients to update.
-const CACHE = 'treino-v4';
+const CACHE = 'treino-v5';
 
 const ASSETS = [
   './',
@@ -14,7 +14,9 @@ const ASSETS = [
   './src/calc.js',
   './src/ui.js',
   './src/theme.js',
+  './src/wakelock.js',
   './src/components/chart.js',
+  './src/components/restTimer.js',
   './src/views/layout.js',
   './src/views/home.js',
   './src/views/session.js',

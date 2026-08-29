@@ -114,6 +114,33 @@ export function isoWeek(dateStr) {
   return `${d.getFullYear()}-W${String(week).padStart(2, '0')}`;
 }
 
+// session length in whole minutes (startedAt -> finishedAt), or null
+export function sessionDuration(session) {
+  if (!session.startedAt || !session.finishedAt) return null;
+  const ms = new Date(session.finishedAt) - new Date(session.startedAt);
+  if (!(ms > 0)) return null;
+  return Math.round(ms / 60000);
+}
+export function fmtDuration(min) {
+  if (min == null) return '—';
+  if (min < 60) return `${min} min`;
+  return `${Math.floor(min / 60)}h${String(min % 60).padStart(2, '0')}`;
+}
+
+// work sets per muscle group for a given ISO week (default: current week)
+export function muscleSetsForWeek(sessions, muscleOf, week) {
+  const wk = week || isoWeek(new Date().toISOString().slice(0, 10));
+  const out = {};
+  for (const s of sessions) {
+    if (!s.finishedAt || isoWeek(s.date) !== wk) continue;
+    for (const e of s.entries || []) {
+      const m = muscleOf(e.exerciseId) || 'outros';
+      out[m] = (out[m] || 0) + workSets(e).length;
+    }
+  }
+  return out; // { peito: 8, costas: 6, ... }
+}
+
 export function weeklyVolume(sessions, opts) {
   const map = new Map();
   for (const s of sessions) {

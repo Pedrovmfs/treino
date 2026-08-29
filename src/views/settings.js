@@ -4,9 +4,40 @@ import { navigate } from '../router.js';
 import * as store from '../store.js';
 import * as db from '../db.js';
 import { applyTheme } from '../theme.js';
+import { wakeLockSupported } from '../wakelock.js';
+
+const toggle = (on, onClick) => el('button', {
+  class: 'btn-sm' + (on ? ' btn-primary' : ''), style: 'min-width:64px', onclick: onClick,
+}, on ? 'ON' : 'OFF');
 
 export function settings() {
   const kids = [];
+
+  // treino
+  const restOn = store.getMeta('restTimerOn', true);
+  const awake = store.getMeta('keepAwake', true);
+  const restField = (key, label, dflt) => el('div', { class: 'row between', style: 'gap:10px' },
+    el('label', { style: 'margin:0;flex:1' }, label),
+    el('input', {
+      type: 'text', inputmode: 'numeric', style: 'width:70px;text-align:center',
+      value: store.getMeta(key, dflt),
+      onchange: (e) => store.setMeta(key, Math.max(0, parseInt(e.target.value, 10) || dflt)),
+    }),
+    el('small', {}, 's'));
+  kids.push(card({},
+    el('h3', {}, 'Treino'),
+    el('div', { class: 'row between', style: 'margin-bottom:8px' },
+      el('label', { style: 'margin:0' }, 'Timer de descanso ao marcar série'),
+      toggle(restOn, async () => { await store.setMeta('restTimerOn', !restOn); navigate('/settings'); })),
+    restOn ? el('div', { class: 'stack', style: 'margin:8px 0 12px' },
+      restField('restWork', 'Descanso após válida', 120),
+      restField('restPrep', 'Descanso após prep', 75),
+      restField('restWarmup', 'Descanso após aquecimento', 45),
+    ) : null,
+    el('div', { class: 'row between' },
+      el('label', { style: 'margin:0' }, 'Manter tela acesa no treino'
+        + (wakeLockSupported() ? '' : ' (não suportado)')),
+      toggle(awake, async () => { await store.setMeta('keepAwake', !awake); navigate('/settings'); }))));
 
   // theme
   const theme = store.getMeta('theme', 'auto');

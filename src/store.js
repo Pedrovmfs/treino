@@ -1,5 +1,5 @@
 import * as db from './db.js';
-import { seedIfNeeded, defaultSetTypes } from './seed.js';
+import { seedIfNeeded, defaultSetTypes, DEFAULT_INCREMENTS, DEFAULT_INCREMENT } from './seed.js';
 import { lastEntryFor, isFilled } from './calc.js';
 
 export const state = { exercises: [], workouts: [], sessions: [], meta: {} };
@@ -15,6 +15,7 @@ export async function load() {
   await db.open();
   await seedIfNeeded();
   await migrateDoneFlag();
+  await migrateIncrements();
   const [exercises, workouts, sessions, metaRows] = await Promise.all([
     db.getAll('exercises'), db.getAll('workouts'), db.getAll('sessions'), db.getAll('meta'),
   ]);
@@ -49,7 +50,26 @@ async function migrateDoneFlag() {
   await db.metaSet('migratedDone', true);
 }
 
+// Backfill per-exercise load increment (added for the +/- steppers).
+async function migrateIncrements() {
+  if (await db.metaGet('migratedIncrements')) return;
+  const exercises = await db.getAll('exercises');
+  const changed = [];
+  for (const ex of exercises) {
+    if (ex.increment == null) {
+      ex.increment = DEFAULT_INCREMENTS[ex.id] ?? DEFAULT_INCREMENT;
+      changed.push(ex);
+    }
+  }
+  if (changed.length) await db.bulkPut('exercises', changed);
+  await db.metaSet('migratedIncrements', true);
+}
+
 export const exerciseById = (id) => state.exercises.find((e) => e.id === id);
+export const exerciseIncrement = (id) => {
+  const v = Number(exerciseById(id)?.increment);
+  return v > 0 ? v : DEFAULT_INCREMENT;
+};
 export const workoutById = (id) => state.workouts.find((w) => w.id === id);
 export const sessionById = (id) => state.sessions.find((s) => s.id === id);
 export const exerciseName = (id) => exerciseById(id)?.name || '(removido)';
@@ -69,8 +89,10 @@ export const getMeta = (k, d = null) => (k in state.meta ? state.meta[k] : d);
 
 // ---------- exercises ----------
 export async function saveExercise(ex) {
+  const inc = Number(ex.increment);
   const rec = { id: ex.id || uid(), name: ex.name.trim(), muscle: (ex.muscle || '').trim(),
-    notes: ex.notes || '', createdAt: ex.createdAt || new Date().toISOString() };
+    notes: ex.notes || '', increment: inc > 0 ? inc : DEFAULT_INCREMENT,
+    createdAt: ex.createdAt || new Date().toISOString() };
   await db.put('exercises', rec);
   const i = state.exercises.findIndex((e) => e.id === rec.id);
   if (i >= 0) state.exercises[i] = rec; else state.exercises.push(rec);

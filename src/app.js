@@ -8,6 +8,7 @@ import { history } from './views/history.js';
 import { progressList, progressDetail } from './views/progress.js';
 import { manage, workoutEditor } from './views/manage.js';
 import { settings } from './views/settings.js';
+import { setWakeLock } from './wakelock.js';
 
 const app = document.getElementById('app');
 const tabbar = document.getElementById('tabbar');
@@ -27,6 +28,12 @@ function mount(viewFn) {
   }
   window.scrollTo(0, 0);
   updateTabs();
+
+  // keep the screen on only while logging an unfinished session (if enabled)
+  const path = currentPath().split('?')[0];
+  const inActiveSession = path.startsWith('/session/')
+    && !store.sessionById(path.split('/')[2])?.finishedAt;
+  setWakeLock(inActiveSession && store.getMeta('keepAwake', true));
 }
 
 const TABS = [

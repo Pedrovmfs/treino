@@ -51,17 +51,21 @@ function editExercise(ex) {
   const isNew = !ex;
   const name = el('input', { value: ex?.name || '', placeholder: 'Nome do exercício' });
   const muscle = el('input', { value: ex?.muscle || '', placeholder: 'Grupo muscular', list: 'muscles' });
-  const notes = el('textarea', { value: ex?.notes || '', placeholder: 'Observações (técnica, setup...)' });
+  const increment = el('input', { type: 'text', inputmode: 'decimal', value: ex?.increment ?? 2.5, placeholder: '2.5' });
+  const notes = el('textarea', { value: ex?.notes || '', placeholder: 'Nota fixa: setup da máquina, pegada, furo do pino...' });
   const box = el('div', { class: 'card', style: 'position:fixed;left:12px;right:12px;bottom:80px;top:auto;z-index:60;max-width:600px;margin:0 auto;max-height:70vh;overflow:auto' },
     el('h3', {}, isNew ? 'Novo exercício' : 'Editar exercício'),
     el('div', { class: 'field' }, el('label', {}, 'Nome'), name),
     el('datalist', { id: 'muscles' }, ...['peito', 'costas', 'ombro', 'bíceps', 'tríceps', 'quadríceps', 'posterior', 'glúteo', 'panturrilha', 'antebraço', 'abdômen'].map((m) => el('option', { value: m }))),
     el('div', { class: 'field' }, el('label', {}, 'Grupo muscular'), muscle),
-    el('div', { class: 'field' }, el('label', {}, 'Observações'), notes),
+    el('div', { class: 'field' },
+      el('label', {}, 'Incremento dos botões +/− (kg)'),
+      increment),
+    el('div', { class: 'field' }, el('label', {}, 'Nota fixa (aparece no treino)'), notes),
     el('div', { class: 'row', style: 'gap:8px;margin-top:12px' },
       el('button', { class: 'btn-primary', style: 'flex:1', onclick: async () => {
         if (!name.value.trim()) return toast('Informe o nome');
-        await store.saveExercise({ ...(ex || {}), name: name.value, muscle: muscle.value, notes: notes.value });
+        await store.saveExercise({ ...(ex || {}), name: name.value, muscle: muscle.value, notes: notes.value, increment: parseFloat(String(increment.value).replace(',', '.')) });
         box.remove(); toast('Salvo'); navigate('/manage');
       } }, 'Salvar'),
       !isNew && !store.exerciseInUse(ex.id)
