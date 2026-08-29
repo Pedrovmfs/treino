@@ -15,6 +15,7 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SW = ROOT / "sw.js"
+VERSION_JS = ROOT / "src" / "version.js"
 PAGES_URL = "https://pedrovmfs.github.io/treino/"
 
 
@@ -39,6 +40,11 @@ def main():
     SW.write_text(text[: m.start()] + f"const CACHE = 'treino-v{new_v}'" + text[m.end():],
                   encoding="utf-8")
     print(f"sw.js  ->  treino-v{new_v}")
+
+    vtext = VERSION_JS.read_text(encoding="utf-8")
+    VERSION_JS.write_text(re.sub(r"APP_VERSION = '[^']*'", f"APP_VERSION = 'v{new_v}'", vtext),
+                          encoding="utf-8")
+    print(f"version.js  ->  v{new_v}")
 
     msg = " ".join(sys.argv[1:]).strip() or f"update {datetime.date.today().isoformat()}"
     git("add", "-A")

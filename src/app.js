@@ -112,6 +112,19 @@ async function boot() {
     // updateViaCache:'none' => the sw.js update check never uses the HTTP cache
     navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then((reg) => {
       reg.update().catch(() => {});
+
+      // when a new version finishes installing, reload to it. controllerchange
+      // usually does this first; the timeout is the iOS-standalone fallback.
+      reg.addEventListener('updatefound', () => {
+        const nw = reg.installing;
+        if (!nw) return;
+        nw.addEventListener('statechange', () => {
+          if (nw.state === 'installed' && navigator.serviceWorker.controller && !reloading) {
+            setTimeout(() => { if (!reloading) { reloading = true; location.reload(); } }, 4000);
+          }
+        });
+      });
+
       // check for a new version whenever the app returns to the foreground
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') reg.update().catch(() => {});

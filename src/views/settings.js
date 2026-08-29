@@ -5,6 +5,7 @@ import * as store from '../store.js';
 import * as db from '../db.js';
 import { applyTheme } from '../theme.js';
 import { wakeLockSupported } from '../wakelock.js';
+import { APP_VERSION, checkForUpdate } from '../update.js';
 
 const toggle = (on, onClick) => el('button', {
   class: 'btn-sm' + (on ? ' btn-primary' : ''), style: 'min-width:64px', onclick: onClick,
@@ -75,11 +76,25 @@ export function settings() {
   kids.push(stCard);
   setTimeout(reportStorage, 0);
 
-  // stats
+  // stats + version / update
+  const upStatus = el('small', { class: 'muted' });
+  const upMsg = {
+    checking: 'Verificando…', downloading: 'Baixando nova versão…',
+    updating: 'Atualizando — a tela vai recarregar…', current: 'Você já está na versão mais recente.',
+    offline: 'Sem internet agora.', 'no-sw': 'App não instalado (sem service worker).',
+    unsupported: 'Não suportado neste navegador.',
+  };
   kids.push(card({},
     el('h3', {}, 'Resumo'),
     el('p', { class: 'muted', style: 'font-size:.85rem' },
-      `${store.state.workouts.length} treinos · ${store.state.exercises.length} exercícios · ${store.finishedSessions().length} sessões registradas`)));
+      `${store.state.workouts.length} treinos · ${store.state.exercises.length} exercícios · ${store.finishedSessions().length} sessões registradas`),
+    el('div', { class: 'row between', style: 'margin-top:10px' },
+      el('div', {}, el('div', { style: 'font-size:.85rem' }, 'Versão ', el('strong', {}, APP_VERSION)), upStatus),
+      el('button', { class: 'btn-sm', onclick: async (e) => {
+        e.target.disabled = true;
+        await checkForUpdate((s) => { upStatus.textContent = upMsg[s] || s; });
+        e.target.disabled = false;
+      } }, 'Buscar atualização'))));
 
   // danger
   kids.push(card({},

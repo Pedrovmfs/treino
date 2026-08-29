@@ -1,5 +1,5 @@
 // Bump this string on every deploy to force clients to update.
-const CACHE = 'treino-v7';
+const CACHE = 'treino-v8';
 
 const ASSETS = [
   './',
@@ -14,6 +14,8 @@ const ASSETS = [
   './src/calc.js',
   './src/ui.js',
   './src/theme.js',
+  './src/version.js',
+  './src/update.js',
   './src/wakelock.js',
   './src/components/chart.js',
   './src/components/restTimer.js',
@@ -46,6 +48,10 @@ self.addEventListener('install', (e) => {
     if (shell.some((r) => !r)) throw new Error('shell incompleto — nova versão adiada');
     await self.skipWaiting();
   })());
+});
+
+self.addEventListener('message', (e) => {
+  if (e.data === 'skipWaiting') self.skipWaiting();
 });
 
 self.addEventListener('activate', (e) => {
