@@ -158,10 +158,21 @@ textarea { min-height: 72px; resize: vertical; }
   font-size: 1.15rem; line-height: 1; border-radius: 8px;
   background: var(--surface-2);
 }
-.set-row .prev-hint {
-  grid-column: 2 / 4; font-size: .72rem; color: var(--text-dim); margin-top: 2px;
-  cursor: pointer;
+.set-extra {
+  grid-column: 1 / -1;
+  display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center;
+  margin-top: 4px;
 }
+.link-btn {
+  min-height: 0; padding: 2px 4px; border: none; background: none;
+  color: var(--accent); font-size: .74rem;
+}
+.rir-pill {
+  min-height: 0; padding: 3px 8px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--surface-2);
+  color: var(--text-dim); font-size: .72rem;
+}
+.ex-pr { font-weight: 700; }
 .chk { width: 32px; height: 40px; display: grid; place-items: center; }
 .chk input { width: 22px; height: 22px; min-height: 0; }
 
@@ -244,6 +255,11 @@ svg.chart { display: block; width: 100%; height: auto; touch-action: pan-y; }
   max-width: 90vw;
 }
 .toast.show { opacity: .95; }
+.toast { display: flex; align-items: center; gap: 12px; }
+.toast-action {
+  min-height: 0; padding: 4px 10px; border: none; border-radius: 999px;
+  background: var(--bg); color: var(--accent); font-weight: 700; font-size: .85rem;
+}
 .drag-handle { cursor: grab; color: var(--text-dim); padding: 0 4px; touch-action: none; }
 .reorder-item { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); }
 .reorder-item.dragging { opacity: .4; }

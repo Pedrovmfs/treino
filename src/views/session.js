@@ -2,7 +2,9 @@ import { el, parseNum, num, fmtDate, toast, confirmAction, deltaEl } from '../ui
 import { screen, card } from './layout.js';
 import { navigate } from '../router.js';
 import * as store from '../store.js';
-import { workSets, setScore, isFilled, sessionDuration, fmtDuration } from '../calc.js';
+import {
+  workSets, setScore, isFilled, sessionDuration, fmtDuration, exerciseSeries, prBreaks,
+} from '../calc.js';
 import { startRest, stopRest, unlockAudio } from '../components/restTimer.js';
 
 // most recent finished session (other than `session`) that came before it
@@ -19,6 +21,7 @@ function previousEntry(session, exerciseId) {
 
 const TYPE_CYCLE = { warmup: 'prep', prep: 'work', work: 'warmup' };
 const TYPE_LABEL = { warmup: 'aquec', prep: 'prep', work: 'válida' };
+const RIR_CYCLE = { '': '0', 0: '1', 1: '2', 2: '3', 3: '4', 4: '' };
 
 const restFor = (type) => {
   const k = type === 'work' ? 'restWork' : type === 'prep' ? 'restPrep' : 'restWarmup';
@@ -33,6 +36,20 @@ let saveTimer;
 function autosave(session) {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => store.saveSession(session), 400);
+}
+
+function elapsedBadge(session) {
+  const span = el('span', { class: 'pill', style: 'align-self:flex-end;margin-bottom:8px' });
+  const paint = () => {
+    const min = Math.max(0, Math.round((Date.now() - new Date(session.startedAt)) / 60000));
+    span.textContent = '⏱ ' + fmtDuration(min);
+  };
+  paint();
+  const iv = setInterval(() => {
+    if (!span.isConnected) { clearInterval(iv); return; }
+    paint();
+  }, 15000);
+  return span;
 }
 
 export function sessionView({ id }) {
@@ -51,7 +68,7 @@ export function sessionView({ id }) {
       finished
         ? el('span', { class: 'pill', style: 'align-self:flex-end;margin-bottom:8px' },
             'Finalizado' + (dur != null ? ` · ${fmtDuration(dur)}` : ''))
-        : null),
+        : elapsedBadge(session)),
     el('div', { class: 'field' },
       el('label', {}, 'Peso corporal (opcional)'),
       el('input', { type: 'text', inputmode: 'decimal', value: session.bodyweight ?? '',
@@ -89,34 +106,58 @@ export function sessionView({ id }) {
     bottom.append(el('button', { class: 'btn btn-block', onclick: async () => { await store.reopenSession(session); toast('Reaberto'); navigate('/session/' + session.id); } }, 'Reabrir para editar'));
   }
   bottom.append(el('button', { class: 'btn-danger btn-block', onclick: async () => {
-    if (await confirmAction('Excluir esta sessão? Não dá para desfazer.')) { stopRest(); await store.deleteSession(session.id); toast('Excluída'); navigate('/history'); }
+    if (await confirmAction('Excluir esta sessão?')) {
+      stopRest();
+      await store.deleteSession(session.id);
+      navigate('/history');
+      store.offerUndo();
+    }
   } }, 'Excluir sessão'));
   kids.push(bottom);
 
   return screen({ title: session.workoutName, back: finished ? '/history' : '/', children: kids });
 }
 
+function scrollToEntry(ei) {
+  document.getElementById('entry-' + ei)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 function entryCard(session, entry, ei, finished) {
   const ex = store.exerciseById(entry.exerciseId);
   const prev = previousEntry(session, entry.exerciseId);
+  const history = exerciseSeries(store.finishedSessions(), entry.exerciseId);
+  const prToasted = new WeakSet();
+  const isLast = ei === session.entries.length - 1;
 
-  const wrap = card({});
+  const wrap = card({ id: 'entry-' + ei });
 
   // header
   const prevBest = prev ? Math.max(0, ...workSets(prev.entry).map(setScore)) : 0;
   const deltaSlot = el('span');
   const checkMark = el('span', { class: 'ex-check' });
+  const prMark = el('span', { class: 'ex-pr' });
   const updateDelta = () => {
-    const done = workSets(entry).length;
-    const cb = Math.max(0, ...workSets(entry).map(setScore));
+    const ws = workSets(entry);
+    const cb = Math.max(0, ...ws.map(setScore));
     deltaSlot.replaceChildren(cb && prevBest ? deltaEl(cb, prevBest, ' 1RM') : document.createTextNode(''));
-    checkMark.textContent = done ? '✓ ' : '';
-    wrap.classList.toggle('done-ex', done > 0);
+    checkMark.textContent = ws.length ? '✓ ' : '';
+    prMark.textContent = ws.some((s) => prBreaks(history, s.weight, s.reps).length) ? '🏆 ' : '';
+    wrap.classList.toggle('done-ex', ws.length > 0);
+  };
+  const maybePR = (set) => {
+    if (set.done && set.type === 'work' && isFilled(set)) {
+      const brk = prBreaks(history, set.weight, set.reps);
+      if (brk.length && !prToasted.has(set)) {
+        prToasted.add(set);
+        toast(`🏆 PR de ${brk.join(' + ')}  —  ${num(set.weight)}×${num(set.reps)}`);
+      }
+    }
+    updateDelta();
   };
   updateDelta();
   wrap.append(el('div', { class: 'row between' },
     el('div', { style: 'flex:1' },
-      el('h3', { style: 'margin-bottom:2px' }, checkMark, entry.exerciseName || (ex && ex.name) || '(exercício)'),
+      el('h3', { style: 'margin-bottom:2px' }, prMark, checkMark, entry.exerciseName || (ex && ex.name) || '(exercício)'),
       el('small', {}, [
         ex && ex.muscle ? ex.muscle + ' · ' : '',
         `alvo ${entry.repMin ?? 8}–${entry.repMax ?? 10} reps`,
@@ -124,56 +165,52 @@ function entryCard(session, entry, ei, finished) {
       ].join(''))),
     deltaSlot));
 
-  // fixed note for this exercise (setup da máquina, pegada, etc.)
+  // fixed note for this exercise
   const noteLine = el('div', { class: 'ex-note' });
-  const paintNote = () => {
-    const cur = store.exerciseById(entry.exerciseId);
-    noteLine.replaceChildren();
-    if (cur && cur.notes) {
-      noteLine.append(el('span', { class: 'muted', style: 'font-size:.8rem' }, '📌 ' + cur.notes));
-    }
-    if (!finished) {
-      noteLine.append(el('button', {
-        class: 'btn-sm btn-ghost', style: 'padding:2px 6px;min-height:0;font-size:.78rem',
-        onclick: () => editExerciseNote(session, entry.exerciseId),
-      }, cur && cur.notes ? 'editar' : '+ nota fixa'));
-    }
-  };
-  paintNote();
+  const cur = store.exerciseById(entry.exerciseId);
+  if (cur && cur.notes) noteLine.append(el('span', { class: 'muted', style: 'font-size:.8rem' }, '📌 ' + cur.notes));
+  if (!finished) {
+    noteLine.append(el('button', {
+      class: 'btn-sm btn-ghost', style: 'padding:2px 6px;min-height:0;font-size:.78rem',
+      onclick: () => editExerciseNote(session, entry.exerciseId),
+    }, cur && cur.notes ? 'editar' : '+ nota fixa'));
+  }
   wrap.append(noteLine);
 
   // previous
-  const prevLine = prev
-    ? 'Anterior (' + fmtDate(prev.session.date) + '): ' +
-      (workSets(prev.entry).map((s) => `${num(s.weight)}×${num(s.reps)}`).join('  ') || '—')
-    : 'Sem registro anterior';
-  wrap.append(el('div', { class: 'muted', style: 'font-size:.8rem;margin:6px 0 8px' }, prevLine));
+  wrap.append(el('div', { class: 'muted', style: 'font-size:.8rem;margin:6px 0 8px' },
+    prev
+      ? 'Anterior (' + fmtDate(prev.session.date) + '): ' +
+        (workSets(prev.entry).map((s) => `${num(s.weight)}×${num(s.reps)}`).join('  ') || '—')
+      : 'Sem registro anterior'));
 
   // set rows
   const setsBox = el('div', {});
   const renderSets = () => {
     setsBox.innerHTML = '';
-    entry.sets.forEach((set, si) => setsBox.append(setRow(session, entry, set, si, prev, finished, renderSets, updateDelta)));
+    entry.sets.forEach((set, si) => setsBox.append(
+      setRow(session, entry, set, si, prev, finished, renderSets, updateDelta, maybePR, ei, isLast)));
     updateDelta();
   };
   renderSets();
   wrap.append(setsBox);
 
-  // add/remove set
   if (!finished) {
     wrap.append(el('div', { class: 'row', style: 'gap:8px;margin-top:8px' },
       el('button', { class: 'btn-sm', onclick: () => { entry.sets.push({ type: 'work', weight: null, reps: null, done: false }); store.saveSession(session); renderSets(); } }, '+ série'),
-      entry.sets.length > 1 ? el('button', { class: 'btn-sm', onclick: () => { entry.sets.pop(); store.saveSession(session); renderSets(); } }, '− série') : null,
-      el('button', { class: 'btn-sm btn-ghost', style: 'margin-left:auto', onclick: () => swapExercise(session, entry, ei) }, 'Trocar exercício')));
+      entry.sets.length > 1 ? el('button', { class: 'btn-sm', onclick: async () => {
+        await store.mutateSession(session, 'Série removida', () => { entry.sets.pop(); });
+        renderSets(); store.offerUndo();
+      } }, '− série') : null,
+      el('button', { class: 'btn-sm btn-ghost', onclick: () => swapExercise(session, entry, ei) }, 'Trocar'),
+      !isLast ? el('button', { class: 'btn-sm btn-ghost', style: 'margin-left:auto', onclick: () => scrollToEntry(ei + 1) }, 'Próximo ↓') : null));
   }
 
   return wrap;
 }
 
 function stepInput({ value, step, min = 0, inputmode, placeholder, disabled, onset }) {
-  const input = el('input', {
-    type: 'text', inputmode, placeholder, value: value ?? '', disabled,
-  });
+  const input = el('input', { type: 'text', inputmode, placeholder, value: value ?? '', disabled });
   const bump = (dir) => {
     const cur = parseNum(input.value);
     const base = cur == null ? (dir > 0 ? 0 : step) : cur;
@@ -182,19 +219,25 @@ function stepInput({ value, step, min = 0, inputmode, placeholder, disabled, ons
     input.value = String(v);
     onset(v, 'step');
   };
-  const minus = el('button', { class: 'btn', disabled, onclick: () => bump(-1) }, '−');
-  const plus = el('button', { class: 'btn', disabled, onclick: () => bump(1) }, '+');
   input.addEventListener('input', () => onset(parseNum(input.value), 'input'));
   input.addEventListener('change', () => onset(parseNum(input.value), 'change'));
   input.addEventListener('focus', unlockAudio);
-  return { wrap: el('div', { class: 'stepper' }, minus, input, plus), input };
+  return {
+    wrap: el('div', { class: 'stepper' },
+      el('button', { class: 'btn', disabled, onclick: () => bump(-1) }, '−'),
+      input,
+      el('button', { class: 'btn', disabled, onclick: () => bump(1) }, '+')),
+    input,
+  };
 }
 
-function setRow(session, entry, set, si, prev, finished, renderSets, updateDelta) {
+function setRow(session, entry, set, si, prev, finished, renderSets, updateDelta, maybePR, ei, isLast) {
   const prevSameType = prev ? (prev.entry.sets || []).filter((s) => s.type === set.type && isFilled(s)) : [];
   const idxInType = entry.sets.slice(0, si + 1).filter((s) => s.type === set.type).length - 1;
   const hint = prevSameType[idxInType];
   const inc = store.exerciseIncrement(entry.exerciseId);
+
+  const allWorkDone = () => workSets(entry).length >= entry.sets.filter((s) => s.type === 'work').length;
 
   const chkInput = el('input', {
     type: 'checkbox', checked: !!set.done, disabled: finished,
@@ -202,8 +245,11 @@ function setRow(session, entry, set, si, prev, finished, renderSets, updateDelta
       unlockAudio();
       const was = set.done;
       set.done = e.target.checked;
-      updateDelta(); autosave(session);
-      if (!was && set.done) maybeRest(set);
+      updateDelta(); store.saveSession(session);
+      if (!was && set.done) {
+        maybeRest(set); maybePR(set);
+        if (set.type === 'work' && !isLast && allWorkDone()) setTimeout(() => scrollToEntry(ei + 1), 250);
+      }
     },
   });
 
@@ -212,18 +258,18 @@ function setRow(session, entry, set, si, prev, finished, renderSets, updateDelta
     onset: (v, how) => {
       set.weight = v;
       updateDelta();
-      if (how === 'change' || how === 'step') store.saveSession(session); else autosave(session);
+      if (how === 'change' || how === 'step') { store.saveSession(session); maybePR(set); } else autosave(session);
     },
   });
 
   const applyReps = (v, commit) => {
     set.reps = v;
-    set.done = set.reps != null;      // entering reps = "série feita"
+    set.done = set.reps != null;
     chkInput.checked = set.done;
     updateDelta();
     if (commit) {
       store.saveSession(session);
-      if (set.done) maybeRest(set);   // blurring a completed set starts the rest
+      if (set.done) { maybeRest(set); maybePR(set); }
     } else {
       autosave(session);
     }
@@ -235,41 +281,61 @@ function setRow(session, entry, set, si, prev, finished, renderSets, updateDelta
     onchange: (e) => applyReps(parseNum(e.target.value), true),
     onfocus: unlockAudio,
   });
-  const r = { wrap: rInput };
 
-  const tag = el('div', { class: 'set-tag', dataset: { type: set.type }, title: 'tocar p/ mudar o tipo' },
-    TYPE_LABEL[set.type]);
+  const tag = el('div', { class: 'set-tag', dataset: { type: set.type }, title: 'tocar p/ mudar o tipo' }, TYPE_LABEL[set.type]);
   if (!finished) tag.addEventListener('click', () => { set.type = TYPE_CYCLE[set.type]; store.saveSession(session); renderSets(); });
 
-  const chk = el('label', { class: 'chk' }, chkInput);
+  const row = el('div', { class: 'set-row' }, tag, w.wrap, rInput, el('label', { class: 'chk' }, chkInput));
 
-  const row = el('div', { class: 'set-row' }, tag, w.wrap, r.wrap, chk);
+  // second line: prev-hint copy · RIR · per-set note
+  const extra = el('div', { class: 'set-extra' });
   if (hint && !finished) {
-    row.append(el('div', { class: 'prev-hint', onclick: () => {
+    extra.append(el('button', { class: 'link-btn', onclick: () => {
       set.weight = Number(hint.weight); set.reps = Number(hint.reps); set.done = true;
       store.saveSession(session); renderSets();
-    } }, `ant: ${num(hint.weight)}×${num(hint.reps)} — tocar p/ copiar`));
+    } }, `ant ${num(hint.weight)}×${num(hint.reps)} ⧉`));
   }
+  if (set.type === 'work' && store.getMeta('trackRIR', false) && !finished) {
+    const rir = el('button', { class: 'rir-pill' }, 'RIR ' + (set.rir ?? '—'));
+    rir.addEventListener('click', () => {
+      const nextRaw = RIR_CYCLE[set.rir ?? ''];
+      set.rir = nextRaw === '' ? null : Number(nextRaw);
+      rir.textContent = 'RIR ' + (set.rir ?? '—');
+      store.saveSession(session);
+    });
+    extra.append(rir);
+  } else if (set.rir != null) {
+    extra.append(el('span', { class: 'muted', style: 'font-size:.74rem' }, 'RIR ' + set.rir));
+  }
+  if (!finished && (set.type === 'work' || set.note)) {
+    extra.append(el('button', { class: 'link-btn', onclick: () => editSetNote(session, set, renderSets) },
+      set.note ? '📝 ' + (set.note.length > 18 ? set.note.slice(0, 18) + '…' : set.note) : '+ nota'));
+  } else if (set.note) {
+    extra.append(el('span', { class: 'muted', style: 'font-size:.74rem' }, '📝 ' + set.note));
+  }
+  if (extra.childNodes.length) row.append(extra);
+
   return row;
 }
 
 async function repeatLast(session) {
   if (!(await confirmAction('Preencher todas as séries com a carga e reps da última vez?'))) return;
   let n = 0;
-  for (const entry of session.entries) {
-    const prev = previousEntry(session, entry.exerciseId);
-    if (!prev) continue;
-    for (const type of ['warmup', 'prep', 'work']) {
-      const cur = entry.sets.filter((s) => s.type === type);
-      const old = (prev.entry.sets || []).filter((s) => s.type === type && isFilled(s));
-      cur.forEach((s, i) => {
-        if (old[i]) { s.weight = Number(old[i].weight); s.reps = Number(old[i].reps); s.done = true; n += 1; }
-      });
+  await store.mutateSession(session, 'Sessão preenchida', () => {
+    for (const entry of session.entries) {
+      const prev = previousEntry(session, entry.exerciseId);
+      if (!prev) continue;
+      for (const type of ['warmup', 'prep', 'work']) {
+        const cur = entry.sets.filter((s) => s.type === type);
+        const old = (prev.entry.sets || []).filter((s) => s.type === type && isFilled(s));
+        cur.forEach((s, i) => {
+          if (old[i]) { s.weight = Number(old[i].weight); s.reps = Number(old[i].reps); s.done = true; n += 1; }
+        });
+      }
     }
-  }
-  await store.saveSession(session);
-  toast(n ? `${n} séries preenchidas` : 'Sem histórico para copiar');
+  });
   navigate('/session/' + session.id);
+  if (n) store.offerUndo(); else toast('Sem histórico para copiar');
 }
 
 function floatingCard(...children) {
@@ -279,6 +345,20 @@ function floatingCard(...children) {
   }, ...children);
   document.body.append(box);
   return box;
+}
+
+function editSetNote(session, set, renderSets) {
+  const ta = el('textarea', { value: set.note || '', placeholder: 'Ex: ombro incomodou · ajuda na última' });
+  const box = floatingCard(
+    el('label', {}, 'Nota da série'),
+    ta,
+    el('div', { class: 'row', style: 'gap:8px;margin-top:10px' },
+      el('button', { class: 'btn-primary', style: 'flex:1', onclick: () => {
+        set.note = ta.value.trim() || undefined;
+        store.saveSession(session); box.remove(); renderSets();
+      } }, 'Salvar'),
+      el('button', { onclick: () => box.remove() }, 'Fechar')));
+  setTimeout(() => ta.focus(), 50);
 }
 
 function editExerciseNote(session, exerciseId) {
@@ -296,18 +376,20 @@ function editExerciseNote(session, exerciseId) {
 }
 
 async function swapExercise(session, entry, ei) {
-  const opts = store.state.exercises;
   const sel = el('select', {},
-    ...opts.map((o) => el('option', { value: o.id, selected: o.id === entry.exerciseId }, `${o.name} (${o.muscle || '—'})`)));
+    ...store.state.exercises.map((o) => el('option', { value: o.id, selected: o.id === entry.exerciseId }, `${o.name} (${o.muscle || '—'})`)));
   const box = floatingCard(
     el('label', {}, 'Trocar exercício deste slot'),
     sel,
     el('div', { class: 'row', style: 'gap:8px;margin-top:10px' },
-      el('button', { class: 'btn-primary', style: 'flex:1', onclick: () => {
-        entry.exerciseId = sel.value;
-        entry.exerciseName = store.exerciseName(sel.value);
-        store.saveSession(session);
-        box.remove(); navigate('/session/' + session.id);
+      el('button', { class: 'btn-primary', style: 'flex:1', onclick: async () => {
+        await store.mutateSession(session, 'Exercício trocado', () => {
+          entry.exerciseId = sel.value;
+          entry.exerciseName = store.exerciseName(sel.value);
+        });
+        box.remove();
+        navigate('/session/' + session.id);
+        store.offerUndo();
       } }, 'Trocar'),
       el('button', { onclick: () => box.remove() }, 'Cancelar')));
 }

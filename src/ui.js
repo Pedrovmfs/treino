@@ -61,13 +61,19 @@ export function relDays(iso) {
 }
 
 let toastTimer;
-export function toast(msg) {
+export function toast(msg, action) {
   let t = document.querySelector('.toast');
   if (!t) { t = el('div', { class: 'toast' }); document.body.append(t); }
-  t.textContent = msg;
+  t.replaceChildren(document.createTextNode(msg));
+  if (action) {
+    t.append(el('button', {
+      class: 'toast-action',
+      onclick: () => { t.classList.remove('show'); action.fn(); },
+    }, action.label));
+  }
   t.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), 1800);
+  toastTimer = setTimeout(() => t.classList.remove('show'), action ? 6000 : 1800);
 }
 
 export const confirmAction = (msg) => Promise.resolve(window.confirm(msg));

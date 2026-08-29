@@ -6,6 +6,7 @@ import * as db from '../db.js';
 import { applyTheme } from '../theme.js';
 import { wakeLockSupported } from '../wakelock.js';
 import { APP_VERSION, checkForUpdate } from '../update.js';
+import * as profiles from '../profiles.js';
 
 const toggle = (on, onClick) => el('button', {
   class: 'btn-sm' + (on ? ' btn-primary' : ''), style: 'min-width:64px', onclick: onClick,
@@ -14,9 +15,12 @@ const toggle = (on, onClick) => el('button', {
 export function settings() {
   const kids = [];
 
+  kids.push(profilesCard());
+
   // treino
   const restOn = store.getMeta('restTimerOn', true);
   const awake = store.getMeta('keepAwake', true);
+  const rirOn = store.getMeta('trackRIR', false);
   const restField = (key, label, dflt) => el('div', { class: 'row between', style: 'gap:10px' },
     el('label', { style: 'margin:0;flex:1' }, label),
     el('input', {
@@ -35,10 +39,13 @@ export function settings() {
       restField('restPrep', 'Descanso após prep', 75),
       restField('restWarmup', 'Descanso após aquecimento', 45),
     ) : null,
-    el('div', { class: 'row between' },
+    el('div', { class: 'row between', style: 'margin-bottom:8px' },
       el('label', { style: 'margin:0' }, 'Manter tela acesa no treino'
         + (wakeLockSupported() ? '' : ' (não suportado)')),
-      toggle(awake, async () => { await store.setMeta('keepAwake', !awake); navigate('/settings'); }))));
+      toggle(awake, async () => { await store.setMeta('keepAwake', !awake); navigate('/settings'); })),
+    el('div', { class: 'row between' },
+      el('label', { style: 'margin:0' }, 'Registrar RIR/RPE por série'),
+      toggle(rirOn, async () => { await store.setMeta('trackRIR', !rirOn); navigate('/settings'); }))));
 
   // theme
   const theme = store.getMeta('theme', 'auto');
@@ -113,6 +120,47 @@ export function settings() {
       } }, 'Resetar app (recarregar exemplos)'))));
 
   return screen({ title: 'Configurações', children: kids });
+}
+
+function profilesCard() {
+  const list = profiles.listProfiles();
+  const curId = profiles.currentProfileId();
+  const rows = list.map((p) => el('div', { class: 'row between', style: 'padding:6px 0' },
+    el('button', {
+      class: 'btn-sm' + (p.id === curId ? ' btn-primary' : ''), style: 'flex:1;text-align:left',
+      onclick: async () => {
+        if (p.id === curId) return;
+        profiles.setCurrentProfileId(p.id);
+        await store.load();
+        toast('Perfil: ' + p.name);
+        navigate('/');
+      },
+    }, (p.id === curId ? '● ' : '○ ') + p.name),
+    el('button', { class: 'btn-sm btn-ghost', onclick: () => {
+      const name = window.prompt('Renomear perfil', p.name);
+      if (name != null) { profiles.renameProfile(p.id, name); navigate('/settings'); }
+    } }, 'renomear'),
+    p.id !== 'default' ? el('button', { class: 'btn-sm btn-danger', onclick: async () => {
+      if (await confirmAction(`Excluir o perfil "${p.name}" e TODOS os dados dele?`)) {
+        await db.deleteProfileData(p.id);
+        profiles.removeProfile(p.id);
+        if (curId === p.id) await store.load();
+        toast('Perfil excluído');
+        navigate('/settings');
+      }
+    } }, 'excluir') : null));
+
+  return card({},
+    el('h3', {}, 'Perfis'),
+    el('p', { class: 'muted', style: 'font-size:.83rem' }, 'Cada perfil tem treinos e histórico próprios neste aparelho.'),
+    el('div', {}, ...rows),
+    el('button', { class: 'btn-sm btn-block', style: 'margin-top:8px', onclick: () => {
+      const name = window.prompt('Nome do novo perfil');
+      if (!name) return;
+      const id = profiles.addProfile(name);
+      profiles.setCurrentProfileId(id);
+      store.load().then(() => { toast('Perfil criado'); navigate('/'); });
+    } }, '+ Novo perfil'));
 }
 
 async function currentBlob() {

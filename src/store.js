@@ -1,6 +1,8 @@
 import * as db from './db.js';
 import { seedIfNeeded, defaultSetTypes, DEFAULT_INCREMENTS, DEFAULT_INCREMENT } from './seed.js';
 import { lastEntryFor, isFilled } from './calc.js';
+import { currentProfileId } from './profiles.js';
+import { toast } from './ui.js';
 
 export const state = { exercises: [], workouts: [], sessions: [], meta: {} };
 
@@ -8,10 +10,22 @@ const listeners = new Set();
 export const onChange = (fn) => { listeners.add(fn); return () => listeners.delete(fn); };
 const emit = () => listeners.forEach((fn) => fn());
 
+// ---------- undo ----------
+let _undo = null; // { label, fn }
+export function registerUndo(label, fn) { _undo = { label, fn }; }
+export function takeUndo() { const u = _undo; _undo = null; return u; }
+export function clearUndo() { _undo = null; }
+// show a toast for the pending undo, if any
+export function offerUndo() {
+  const u = _undo; _undo = null;
+  if (u) toast(u.label, { label: 'Desfazer', fn: () => u.fn() });
+}
+
 const uid = () => (crypto.randomUUID ? crypto.randomUUID()
   : 'id-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8));
 
 export async function load() {
+  db.setProfile(currentProfileId());
   await db.open();
   await seedIfNeeded();
   await migrateDoneFlag();
@@ -208,9 +222,32 @@ export async function reopenSession(session) {
 }
 
 export async function deleteSession(id) {
+  const copy = JSON.parse(JSON.stringify(state.sessions.find((s) => s.id === id) || null));
   await db.del('sessions', id);
   state.sessions = state.sessions.filter((s) => s.id !== id);
+  if (copy) {
+    registerUndo('Sessão excluída', async () => {
+      await db.put('sessions', copy);
+      if (!state.sessions.some((s) => s.id === copy.id)) state.sessions.push(copy);
+      emit();
+    });
+  }
   emit();
+}
+
+// snapshot the mutable fields of a session, run a change, and register an undo
+export async function mutateSession(session, label, change) {
+  const snap = JSON.parse(JSON.stringify({
+    entries: session.entries, notes: session.notes, bodyweight: session.bodyweight,
+    date: session.date, workoutId: session.workoutId, workoutName: session.workoutName,
+  }));
+  await change();
+  await saveSession(session);
+  registerUndo(label, async () => {
+    Object.assign(session, snap);
+    await saveSession(session);
+    emit();
+  });
 }
 
 function todayLocal() {

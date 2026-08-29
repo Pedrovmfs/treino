@@ -1,14 +1,35 @@
 // Minimal promise wrapper around IndexedDB.
-const DB_NAME = 'treino-db';
+const BASE_NAME = 'treino-db';
 const DB_VERSION = 1;
 const STORES = ['exercises', 'workouts', 'sessions', 'meta'];
 
 let _db = null;
+let _profileId = 'default';
+
+// 'default' keeps the original db name so existing data is untouched.
+const dbNameFor = (id) => (id && id !== 'default' ? `${BASE_NAME}-${id}` : BASE_NAME);
+
+export function setProfile(id) {
+  const next = id || 'default';
+  if (next === _profileId) return;
+  _profileId = next;
+  if (_db) { try { _db.close(); } catch { /* ignore */ } _db = null; }
+}
+export const activeProfile = () => _profileId;
+
+export function deleteProfileData(id) {
+  const name = dbNameFor(id);
+  if (_db && dbNameFor(_profileId) === name) { try { _db.close(); } catch { /* ignore */ } _db = null; }
+  return new Promise((res) => {
+    const r = indexedDB.deleteDatabase(name);
+    r.onsuccess = r.onerror = r.onblocked = () => res();
+  });
+}
 
 export function open() {
   if (_db) return Promise.resolve(_db);
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    const req = indexedDB.open(dbNameFor(_profileId), DB_VERSION);
     req.onupgradeneeded = () => {
       const db = req.result;
       if (!db.objectStoreNames.contains('exercises')) db.createObjectStore('exercises', { keyPath: 'id' });

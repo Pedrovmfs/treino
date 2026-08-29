@@ -141,6 +141,79 @@ export function muscleSetsForWeek(sessions, muscleOf, week) {
   return out; // { peito: 8, costas: 6, ... }
 }
 
+// which PRs would a set of (weight × reps) break, given this exercise's history
+export function prBreaks(series, weight, reps) {
+  const w = Number(weight), r = Number(reps);
+  if (!w || !r || !series.length) return [];
+  const maxW = Math.max(...series.map((x) => x.topWeight));
+  const maxE = Math.max(...series.map((x) => x.bestE1rm));
+  const out = [];
+  if (w > maxW) out.push('carga');
+  if (e1rm(w, r) > maxE + 0.05) out.push('1RM');
+  return out;
+}
+
+// PRs (carga or 1RM) first hit in the current month
+export function prsThisMonth(sessions, nameOf) {
+  const month = new Date().toISOString().slice(0, 7);
+  const byEx = new Map();
+  for (const s of sessions) {
+    if (!s.finishedAt) continue;
+    for (const e of s.entries || []) {
+      if (!byEx.has(e.exerciseId)) byEx.set(e.exerciseId, []);
+      byEx.get(e.exerciseId).push({ date: s.date, entry: e });
+    }
+  }
+  const out = [];
+  for (const [exId, arr] of byEx) {
+    arr.sort((a, b) => (a.date < b.date ? -1 : 1));
+    let maxW = 0, maxE = 0;
+    for (const { date, entry } of arr) {
+      const ws = workSets(entry);
+      if (!ws.length) continue;
+      const tw = Math.max(...ws.map((x) => Number(x.weight)));
+      const te = Math.max(...ws.map(setScore));
+      const inMonth = date.slice(0, 7) === month;
+      if (inMonth && maxW > 0 && tw > maxW) out.push({ exId, name: nameOf(exId), kind: 'carga', value: tw, date });
+      if (inMonth && maxE > 0 && te > maxE + 0.05) out.push({ exId, name: nameOf(exId), kind: '1RM', value: Math.round(te * 10) / 10, date });
+      maxW = Math.max(maxW, tw); maxE = Math.max(maxE, te);
+    }
+  }
+  return out.sort((a, b) => (a.date < b.date ? 1 : -1));
+}
+
+export function dailyActivity(sessions) {
+  const m = new Map();
+  for (const s of sessions) {
+    if (!s.finishedAt) continue;
+    const cur = m.get(s.date) || { date: s.date, sets: 0, names: [] };
+    cur.sets += sessionWorkSetCount(s);
+    cur.names.push(s.workoutName);
+    m.set(s.date, cur);
+  }
+  return m;
+}
+
+export function weekStreak(sessions) {
+  const weeks = new Set(sessions.filter((s) => s.finishedAt).map((s) => isoWeek(s.date)));
+  if (!weeks.size) return 0;
+  const d = new Date();
+  let cur = isoWeek(d.toISOString().slice(0, 10));
+  if (!weeks.has(cur)) { d.setDate(d.getDate() - 7); cur = isoWeek(d.toISOString().slice(0, 10)); }
+  let streak = 0;
+  while (weeks.has(cur)) {
+    streak += 1;
+    d.setDate(d.getDate() - 7);
+    cur = isoWeek(d.toISOString().slice(0, 10));
+  }
+  return streak;
+}
+
+export function sessionsInLastDays(sessions, days = 30) {
+  const cutoff = new Date(Date.now() - days * 864e5).toISOString().slice(0, 10);
+  return sessions.filter((s) => s.finishedAt && s.date >= cutoff).length;
+}
+
 export function weeklyVolume(sessions, opts) {
   const map = new Map();
   for (const s of sessions) {

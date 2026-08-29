@@ -3,8 +3,10 @@ import { screen, card, empty } from './layout.js';
 import { navigate } from '../router.js';
 import * as store from '../store.js';
 import { lineChart, barChart } from '../components/chart.js';
+import { heatmap } from '../components/heatmap.js';
 import {
   exerciseSeries, exercisePRs, weeklyVolume, trend, muscleSetsForWeek, isoWeek,
+  dailyActivity, weekStreak, sessionsInLastDays, prsThisMonth,
 } from '../calc.js';
 
 export function progressList() {
@@ -14,6 +16,23 @@ export function progressList() {
   if (!sessions.length) {
     kids.push(empty('Registre alguns treinos para ver a evolução.'));
     return screen({ title: 'Progresso', children: kids });
+  }
+
+  // frequency heatmap + streak
+  kids.push(card({},
+    el('div', { class: 'row between', style: 'align-items:baseline' },
+      el('h3', { style: 'margin:0' }, 'Frequência'),
+      el('small', {}, `${sessionsInLastDays(sessions, 30)} em 30 dias · streak ${weekStreak(sessions)} sem`)),
+    heatmap(dailyActivity(sessions), 16)));
+
+  // PRs do mês
+  const prs = prsThisMonth(sessions, (id) => store.exerciseName(id));
+  if (prs.length) {
+    kids.push(card({},
+      el('h3', {}, '🏆 PRs do mês'),
+      ...prs.slice(0, 8).map((p) => el('div', { class: 'row between', style: 'padding:4px 0;font-size:.88rem' },
+        el('span', {}, p.name),
+        el('span', { class: 'muted' }, `${p.kind} ${num(p.value)}${p.kind === 'carga' ? ' kg' : ''} · ${fmtDate(p.date)}`)))));
   }
 
   // weekly volume
